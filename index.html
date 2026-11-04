@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>寵物防走失救援系統</title>
+  <style>
+    :root { --primary-color: #e74c3c; --bg-color: #f8f9fa; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); margin: 0; padding: 15px; }
+    .container { max-width: 480px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .header { text-align: center; margin-bottom: 15px; }
+    .logo { max-height: 40px; margin-bottom: 5px; }
+    .status-banner { padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; }
+    .status-lost { background: #ffebee; color: #c62828; }
+    .status-normal { background: #e8f5e9; color: #2e7d32; }
+    .pet-photo { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; display: block; margin: 0 auto 15px; }
+    .pet-name { text-align: center; font-size: 24px; margin: 0 0 10px; }
+    .btn { display: block; width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; text-align: center; text-decoration: none; box-sizing: border-box; cursor: pointer; }
+    .btn-call { background: #2ecc71; color: white; }
+    .btn-sms { background: #3498db; color: white; }
+    .btn-social { background: #8e44ad; color: white; }
+    .card { background: #f1f2f6; padding: 15px; border-radius: 10px; margin-top: 15px; }
+    textarea, input[type="text"] { width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+    .footer { text-align: center; font-size: 12px; color: #7f8c8d; margin-top: 25px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 預留 Logo 區 -->
+  <div class="header">
+    <img id="brand-logo" class="logo hidden" src="logo.png" alt="品牌Logo">
+    <h3 id="brand-title" style="margin:0;">🐾 寵物身份識別系統</h3>
+  </div>
+
+  <!-- 狀態標題條 -->
+  <div id="status-banner" class="status-banner status-normal">載入中...</div>
+
+  <!-- 寵物美照與名字 -->
+  <img id="pet-photo" class="pet-photo" src="" alt="寵物照片">
+  <h1 id="pet-name" class="pet-name"></h1>
+  <p id="pet-bio" style="text-align: center; color: #666;"></p>
+
+  <!-- 動態救援 / 聯絡按鈕 -->
+  <div id="action-buttons">
+    <a id="btn-phone" class="btn btn-call hidden" href="">🟢 撥打電話給主人</a>
+    <a id="btn-sms" class="btn btn-sms hidden" href="">🔵 發送簡訊聯絡主人</a>
+    <a id="btn-ig" class="btn btn-social hidden" target="_blank" href="">📸 追蹤寵物 Instagram</a>
+  </div>
+
+  <!-- 醫療與照護備註 (防錯：有資料才顯示) -->
+  <div id="medical-card" class="card hidden">
+    <strong>💊 照護與醫療備註：</strong>
+    <p id="medical-notes" style="margin:5px 0 0 0;"></p>
+  </div>
+
+  <!-- 走失模式：路人留言板 -->
+  <div id="message-board" class="card hidden">
+    <strong>💬 給主人的即時留言：</strong>
+    <textarea id="msg-text" rows="3" placeholder="例如：狗狗目前在全家超商門口休息..."></textarea>
+    <input type="text" id="msg-phone" placeholder="您的聯絡電話 (選填)">
+    <button class="btn btn-sms" style="margin-top:10px;" onclick="sendBoardMessage()">📤 送出留言</button>
+  </div>
+
+  <!-- 頁尾品牌導流 -->
+  <div class="footer">
+    🛡️ 產品由 <span id="footer-brand">[ 品牌名稱預留 ]</span> 防走失系統保護<br>
+    <a href="https://mypetid.com" target="_blank" style="color:#7f8c8d;">[ 前往官網訂製同款皮雕吊牌 ]</a>
+  </div>
+</div>
+
+<script>
+  // ⚙️ 設定區：貼上你的 GAS Web App URL
+  const GAS_API_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+  let currentPetData = null;
+
+  // 1. 取得 URL 中的 ?id=PET10001 參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const petId = urlParams.get('id') || 'PET10001'; // 預設測試 ID
+
+  // 2. 載入資料並動態渲染 UI
+  fetch(`${GAS_API_URL}?id=${petId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) return alert("找不到此寵物資料");
+      currentPetData = data;
+      renderUI(data);
+      if (data.status === 'LOST') handleLocationReport(data);
+    });
+
+  function renderUI(data) {
+    document.getElementById('pet-photo').src = data.pet_photo || 'https://via.placeholder.com/150';
+    document.getElementById('pet-name').innerText = data.pet_name;
+    document.getElementById('pet-bio').innerText = data.bio || '';
+
+    // 防錯判斷 1：醫療備註（有資料才顯示）
+    if (data.medical_notes) {
+      document.getElementById('medical-notes').innerText = data.medical_notes;
+      document.getElementById('medical-card').classList.remove('hidden');
+    }
+
+    // 防錯判斷 2：平時 vs 走失模式切換
+    const banner = document.getElementById('status-banner');
+    if (data.status === 'LOST') {
+      banner.className = 'status-banner status-lost';
+      banner.innerText = '🚨 我走失了！請幫我回到主人身邊';
+      document.getElementById('message-board').classList.remove('hidden');
+
+      // 電話/簡訊按鈕控制
+      if (data.show_phone === true || data.show_phone === 'TRUE') {
+        const btnPhone = document.getElementById('btn-phone');
+        btnPhone.href = `tel:${data.owner_phone}`;
+        btnPhone.classList.remove('hidden');
+      }
+      if (data.show_sms === true || data.show_sms === 'TRUE') {
+        const btnSms = document.getElementById('btn-sms');
+        btnSms.href = `sms:${data.owner_phone}?body=你好！我撿到了您的毛孩${data.pet_name}`;
+        btnSms.classList.remove('hidden');
+      }
+    } else {
+      banner.className = 'status-banner status-normal';
+      banner.innerText = '🐾 我正在跟主人快樂散步中';
+      
+      // IG 連結控制（有資料才顯示）
+      if (data.ig_url) {
+        const btnIg = document.getElementById('btn-ig');
+        btnIg.href = data.ig_url;
+        btnIg.classList.remove('hidden');
+      }
+    }
+  }
+
+  // 3. GPS / IP 雙重定位通報
+  function handleLocationReport(data) {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => sendPayload({ action: 'LOCATION', latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        err => fetchIPLocation() // 拒絕或失敗 ➔ 啟動 IP 備案
+      );
+    } else {
+      fetchIPLocation();
+    }
+  }
+
+  function fetchIPLocation() {
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(ipData => sendPayload({ action: 'LOCATION', ip: ipData.ip }))
+      .catch(() => sendPayload({ action: 'LOCATION', ip: '未知' }));
+  }
+
+  function sendPayload(payload) {
+    payload.petId = currentPetData.pet_id;
+    payload.petName = currentPetData.pet_name;
+    payload.ownerEmail = currentPetData.owner_email;
+    fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  // 4. 路人留言板功能
+  function sendBoardMessage() {
+    const msg = document.getElementById('msg-text').value;
+    const phone = document.getElementById('msg-phone').value;
+    if (!msg) return alert("請輸入留言內容");
+    
+    sendPayload({ action: 'MESSAGE', message: msg, phone: phone });
+    alert("留言已送出，系統已通知主人！感謝您的協助！");
+    document.getElementById('msg-text').value = '';
+  }
+</script>
+</body>
+</html>

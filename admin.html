@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>寵物防走失吊牌 - 飼主管理後台</title>
+  <style>
+    :root {
+      --primary: #8b5a2b;
+      --danger: #d9534f;
+      --success: #5cb85c;
+      --bg: #f7f5f0;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: #333; margin: 0; padding: 16px; }
+    .card { max-width: 520px; margin: 10px auto; background: #fff; padding: 24px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    h2 { color: var(--primary); text-align: center; margin-top: 0; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+    input[type="text"], input[type="tel"], input[type="email"], input[type="url"], select, textarea {
+      width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px;
+    }
+    .checkbox-group { display: flex; gap: 15px; background: #f9f9f9; padding: 10px 14px; border-radius: 6px; border: 1px solid #eee; }
+    .checkbox-label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .status-box { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #eee; border-radius: 8px; margin-bottom: 20px; }
+    .badge { padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #fff; font-size: 14px; }
+    .badge-normal { background: var(--success); }
+    .badge-lost { background: var(--danger); }
+    button { width: 100%; background: var(--primary); color: #fff; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .hidden { display: none; }
+    #msg { margin-top: 15px; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<!-- PIN 碼身分驗證卡片 -->
+<div class="card" id="authCard">
+  <h2>🔒 飼主身分驗證</h2>
+  <div class="form-group">
+    <label for="pinInput">請輸入吊牌 PIN 碼：</label>
+    <input type="password" id="pinInput" maxlength="8" placeholder="6-8 位數 PIN 碼">
+  </div>
+  <button id="loginBtn" onclick="verifyPin()">驗證並登入</button>
+  <div id="authMsg"></div>
+</div>
+
+<!-- 資料管理卡片 -->
+<div class="card hidden" id="adminCard">
+  <h2 id="petTitle">寵物檔案管理</h2>
+  
+  <div class="status-box">
+    <span>目前防走失狀態：</span>
+    <span id="statusBadge" class="badge badge-normal">🟢 平時模式</span>
+  </div>
+
+  <form id="adminForm" onsubmit="saveData(event)">
+    <div class="form-group">
+      <label for="statusSelect">模式切換：</label>
+      <select id="statusSelect" onchange="updateStatusUI()">
+        <option value="NORMAL">🟢 平時模式（秀 IG / FB，隱藏保護資訊）</option>
+        <option value="LOST">🔴 走失救援模式（啟動撥號、簡訊與 GPS 通報）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="petName">寵物名字 *</label>
+      <input type="text" id="petName" required>
+    </div>
+
+    <div class="form-group">
+      <label for="petPhoto">寵物照片網址 (Imgur / Direct Link)</label>
+      <input type="url" id="petPhoto" placeholder="https://i.imgur.com/example.jpg">
+    </div>
+
+    <div class="form-group">
+      <label for="bio">個性簡介與說明</label>
+      <textarea id="bio" rows="2" placeholder="親人、喜歡吃肉乾、有點怕大聲響..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="igUrl">Instagram 帳號網址</label>
+      <input type="url" id="igUrl" placeholder="https://instagram.com/your_pet">
+    </div>
+
+    <div class="form-group">
+      <label for="fbUrl">Facebook 粉專網址</label>
+      <input type="url" id="fbUrl" placeholder="https://facebook.com/your_pet">
+    </div>
+
+    <div class="form-group">
+      <label>一鍵聯絡功能開關：</label>
+      <div class="checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="showPhone"> 顯示電話撥打按鈕
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="showSms"> 顯示發送簡訊按鈕
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="ownerPhone">飼主聯絡電話 *</label>
+      <input type="tel" id="ownerPhone" required placeholder="0912-345-678">
+    </div>
+
+    <div class="form-group">
+      <label for="ownerEmail">接收 GPS 通報的 Email *</label>
+      <input type="email" id="ownerEmail" required placeholder="owner@example.com">
+    </div>
+
+    <div class="form-group">
+      <label for="medicalNotes">特殊醫療或照護備註</label>
+      <textarea id="medicalNotes" rows="3" placeholder="例如：有心臟病需每天吃藥、對特定食物過敏..."></textarea>
+    </div>
+
+    <button type="submit" id="saveBtn">儲存變更</button>
+  </form>
+  <div id="msg"></div>
+</div>
+
+<script>
+  // 從 URL 抓取 id (Token)，例如：admin.html?id=k9x8m2p7v4q1
+  const urlParams = new URLSearchParams(window.location.search);
+  const petId = urlParams.get('id');
+  
+  // ⚠️ 請替換為您的 GAS Web App 部署網址
+  const GAS_URL = "YOUR_GAS_WEB_APP_URL"; 
+
+  if (!petId) {
+    document.body.innerHTML = "<h3 style='text-align:center;color:red;margin-top:50px;'>⚠️ 無效的網址（缺少 ID 參數）</h3>";
+  }
+
+  let currentPin = "";
+
+  function verifyPin() {
+    const pin = document.getElementById('pinInput').value.trim();
+    if (!pin) return alert("請輸入 PIN 碼");
+
+    const loginBtn = document.getElementById('loginBtn');
+    loginBtn.disabled = true;
+    document.getElementById('authMsg').innerText = "驗證中...";
+
+    fetch(`${GAS_URL}?action=getAdminData&id=${petId}&pin=${pin}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "success") {
+          currentPin = pin;
+          document.getElementById('authCard').classList.add('hidden');
+          document.getElementById('adminCard').classList.remove('hidden');
+          
+          const d = res.data;
+          document.getElementById('petTitle').innerText = `${d.pet_name || '寵物'} 檔案管理`;
+          document.getElementById('statusSelect').value = d.status || 'NORMAL';
+          document.getElementById('petName').value = d.pet_name || '';
+          document.getElementById('petPhoto').value = d.pet_photo || '';
+          document.getElementById('bio').value = d.bio || '';
+          document.getElementById('igUrl').value = d.ig_url || '';
+          document.getElementById('fbUrl').value = d.fb_url || '';
+          document.getElementById('showPhone').checked = Boolean(d.show_phone);
+          document.getElementById('showSms').checked = Boolean(d.show_sms);
+          document.getElementById('ownerPhone').value = d.owner_phone || '';
+          document.getElementById('ownerEmail').value = d.owner_email || '';
+          document.getElementById('medicalNotes').value = d.medical_notes || '';
+          
+          updateStatusUI();
+        } else {
+          alert("❌ " + res.message);
+          loginBtn.disabled = false;
+          document.getElementById('authMsg').innerText = "";
+        }
+      })
+      .catch(() => {
+        alert("網路連線失敗，請稍後再試");
+        loginBtn.disabled = false;
+      });
+  }
+
+  function updateStatusUI() {
+    const status = document.getElementById('statusSelect').value;
+    const badge = document.getElementById('statusBadge');
+    if (status === 'LOST') {
+      badge.innerText = '🔴 走失救援模式';
+      badge.className = 'badge badge-lost';
+    } else {
+      badge.innerText = '🟢 平時模式';
+      badge.className = 'badge badge-normal';
+    }
+  }
+
+  function saveData(e) {
+    e.preventDefault();
+    const saveBtn = document.getElementById('saveBtn');
+    const msg = document.getElementById('msg');
+    
+    saveBtn.disabled = true;
+    msg.style.color = "#333";
+    msg.innerText = "正在儲存至 Google Sheet...";
+
+    const payload = {
+      action: "updateAdminData",
+      pet_id: petId,
+      pin: currentPin,
+      status: document.getElementById('statusSelect').value,
+      pet_name: document.getElementById('petName').value,
+      pet_photo: document.getElementById('petPhoto').value,
+      bio: document.getElementById('bio').value,
+      ig_url: document.getElementById('igUrl').value,
+      fb_url: document.getElementById('fbUrl').value,
+      show_phone: document.getElementById('showPhone').checked,
+      show_sms: document.getElementById('showSms').checked,
+      owner_phone: document.getElementById('ownerPhone').value,
+      owner_email: document.getElementById('ownerEmail').value,
+      medical_notes: document.getElementById('medicalNotes').value
+    };
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(res => {
+      saveBtn.disabled = false;
+      if (res.status === "success") {
+        msg.style.color = "green";
+        msg.innerText = "✅ 儲存成功！資料已同步。";
+        setTimeout(() => msg.innerText = "", 3000);
+      } else {
+        msg.style.color = "red";
+        msg.innerText = "❌ 儲存失敗：" + res.message;
+      }
+    })
+    .catch(() => {
+      saveBtn.disabled = false;
+      msg.style.color = "red";
+      msg.innerText = "❌ 網路連線異常";
+    });
+  }
+</script>
+</body>
+</html>

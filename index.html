@@ -75,23 +75,50 @@
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzjKcX8_vz-tH-WDeXx06QTyNXacCtp0uxrQDH7_qvdtu4cThsGy2HbbC-9crsSXLU/exec";
   let currentPetData = null;
 
-  // 1. 取得 URL 中的 ?id=PET10001 參數
+  // 1. 取得 URL 中的 ?id= 參數（不再設定預設 ID）
   const urlParams = new URLSearchParams(window.location.search);
-  const petId = urlParams.get('id') || 'PET10001'; // 預設測試 ID
+  const petId = urlParams.get('id');
 
-  // 2. 載入資料並動態渲染 UI
-  fetch(`${GAS_API_URL}?id=${petId}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.error) return alert("找不到此寵物資料");
-      currentPetData = data;
-      renderUI(data);
-      if (data.status === 'LOST') handleLocationReport(data);
-    });
+  // 2. 檢查是否有傳入 ID
+  if (!petId) {
+    showErrorPage("⚠️ 尚未感應吊牌", "請使用手機感應 NFC 晶片或掃描皮雕背面的 QR Code 以查看寵物資訊。");
+  } else {
+    // 發起 API 請求
+    fetch(`${GAS_API_URL}?id=${encodeURIComponent(petId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data || data.error === "NotFound") {
+          showErrorPage("❌ 找不到寵物資料", "此防走失吊牌尚未開通或連結無效，請聯繫品牌客服。");
+          return;
+        }
+        currentPetData = data;
+        renderUI(data);
+        if (data.status === 'LOST') handleLocationReport(data);
+      })
+      .catch(err => {
+        showErrorPage("網絡連線錯誤", "無法讀取寵物資料，請檢查網路連線後重新整理頁面。");
+      });
+  }
 
+  // 渲染無效網址/錯誤提示頁面
+  function showErrorPage(title, message) {
+    document.getElementById('status-banner').className = 'status-banner status-lost';
+    document.getElementById('status-banner').innerText = title;
+    document.getElementById('pet-name').innerText = title;
+    document.getElementById('pet-bio').innerText = message;
+    
+    // 隱藏圖片與預設卡片元件
+    document.getElementById('pet-photo').style.display = 'none';
+    document.getElementById('action-buttons').classList.add('hidden');
+    document.getElementById('medical-card').classList.add('hidden');
+    document.getElementById('message-board').classList.add('hidden');
+  }
+
+  // 3. 正常載入資料並動態渲染 UI
   function renderUI(data) {
+    // 防範惡意腳本注入 (XSS)：統一使用 innerText
     document.getElementById('pet-photo').src = data.pet_photo || 'https://via.placeholder.com/150';
-    document.getElementById('pet-name').innerText = data.pet_name;
+    document.getElementById('pet-name').innerText = data.pet_name || '未命名寵物';
     document.getElementById('pet-bio').innerText = data.bio || '';
 
     // 防錯判斷 1：醫療備註（有資料才顯示）

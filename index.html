@@ -19,7 +19,7 @@
     .btn-call { background: #2ecc71; color: white; }
     .btn-sms { background: #3498db; color: white; }
     .btn-social { background: #8e44ad; color: white; }
-    .btn-social { background: #8e44ad; color: white; }
+    .btn-facebook { background: #8e44ad; color: white; }
     .card { background: #f1f2f6; padding: 15px; border-radius: 10px; margin-top: 15px; }
     textarea, input[type="text"] { width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
     .footer { text-align: center; font-size: 12px; color: #7f8c8d; margin-top: 25px; }
@@ -98,6 +98,7 @@
         if (data.status === 'LOST') handleLocationReport(data);
       })
       .catch(err => {
+        console.error("真正報錯原因：", error); // 👈 加上這行
         showErrorPage("網絡連線錯誤", "無法讀取寵物資料，請檢查網路連線後重新整理頁面。");
       });
   }

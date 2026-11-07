@@ -47,6 +47,7 @@
     <a id="btn-phone" class="btn btn-call hidden" href="">🟢 撥打電話給主人</a>
     <a id="btn-sms" class="btn btn-sms hidden" href="">🔵 發送簡訊聯絡主人</a>
     <a id="btn-ig" class="btn btn-social hidden" target="_blank" href="">📸 追蹤寵物 Instagram</a>
+    <a id="btn-fb" class="btn btn-facebook hidden" target="_blank" href="">💙 瀏覽 Facebook 粉絲專頁</a>
   </div>
 
   <!-- 醫療與照護備註 (防錯：有資料才顯示) -->
@@ -155,6 +156,14 @@
         btnIg.href = data.ig_url;
         btnIg.classList.remove('hidden');
       }
+
+      // FB 連結控制（有資料才顯示）
+      if (data.fb_url) {
+        const btnFB = document.getElementById('btn-facebook');
+        btnFB.href = data.FB_url;
+        btnFB.classList.remove('hidden');
+      }
+      
     }
   }
 
